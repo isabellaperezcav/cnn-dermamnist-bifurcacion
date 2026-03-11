@@ -1,0 +1,15 @@
+medmnist
+monai==1.4.0
+matplotlib 
+seaborn 
+scikit-learn 
+pandas 
+numpy
+grad-cam
+jupyter 
+ipykernel 
+tqdm
+
+torch==2.5.1 
+torchvision==0.20.1 
+torchaudio==2.5.1

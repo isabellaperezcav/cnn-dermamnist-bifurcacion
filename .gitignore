@@ -1,0 +1,28 @@
+venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv/
+venv/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Data
+data/
+datasets/
+*.csv
+*.h5
+
+# Models
+models/
+checkpoints/
+*.pt
+*.pth
+
+# Logs
+logs/
