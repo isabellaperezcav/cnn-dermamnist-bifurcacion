@@ -1,6 +1,6 @@
-# pipeline.py — v6: upsampling 28x28 → 64x64 con monai.transforms.Resize
-# Cumple requerimiento: MONAI Transforms exclusivamente
-# Resize se aplica en TRAIN, VAL y TEST → no es data leakage
+# pipeline.py — v7
+# Mantiene: Resize 64x64, augmentation suave, WeightedRandomSampler
+# Cambia: pesos rebalanceados según análisis precision/recall de v6
 import torch
 import numpy as np
 from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
@@ -14,18 +14,20 @@ from monai.transforms import (
 MEAN          = [0.7631, 0.5381, 0.5614]
 STD           = [0.1365, 0.1542, 0.1691]
 
-# Pesos v3 que dieron mejor resultado global (acc=0.72, auc=0.92)
-# Con 64x64 el modelo tendrá más capacidad discriminativa,
-# los pesos equilibrados funcionarán mejor
-CLASS_WEIGHTS = [0.96, 0.78, 0.82, 4.87, 0.94, 0.48, 0.89]
+# Pesos v7 — derivados del análisis precision/recall de v6:
+#   dermato[3]:  4.87 → 2.00  precision=0.12 era señal de sobrepredicción
+#   basal[1]:    0.78 → 1.40  recall=0.31 muy bajo, el modelo lo ignoraba
+#   actinic[0]:  0.96 → 1.20  ambas métricas bajas, necesita más atención
+#   melanoma[4]: 0.94 → 1.10  ligero boost
+#   nevi[5]:     mantener 0.48  F1=0.85 ✅
+#   vascular[6]: mantener 0.89  F1=0.66 ✅
+CLASS_WEIGHTS = [1.20, 1.40, 1.00, 2.00, 1.10, 0.48, 0.89]
 
 CLASS_NAMES   = list(INFO["dermamnist"]["label"].values())
 NUM_CLASSES   = len(CLASS_NAMES)
 
-# ── TRAIN: Resize + Normalize + Augmentation ─────────────
-# Resize va PRIMERO para que todas las aug operen sobre 64x64
 train_transforms = Compose([
-    Resize(spatial_size=(64, 64)),           # MONAI Resize: 28x28 → 64x64
+    Resize(spatial_size=(64, 64)),
     NormalizeIntensity(subtrahend=MEAN, divisor=STD, channel_wise=True),
     RandFlip(spatial_axis=1, prob=0.5),
     RandFlip(spatial_axis=0, prob=0.5),
@@ -35,8 +37,6 @@ train_transforms = Compose([
     RandAdjustContrast(prob=0.2, gamma=(0.85, 1.25)),
 ])
 
-# ── VAL/TEST: solo Resize + Normalize ────────────────────
-# Resize también aquí → no es data leakage, es preprocesamiento
 val_test_transforms = Compose([
     Resize(spatial_size=(64, 64)),
     NormalizeIntensity(subtrahend=MEAN, divisor=STD, channel_wise=True),
@@ -88,5 +88,4 @@ def get_dataloaders(batch_size=64, num_workers=0):
                               num_workers=num_workers, pin_memory=True)
     test_loader  = DataLoader(test_ds,  batch_size=batch_size, shuffle=False,
                               num_workers=num_workers, pin_memory=True)
-
     return train_loader, val_loader, test_loader
