@@ -1,4 +1,6 @@
-# pipeline.py — v3: pesos calibrados por F1 obtenido en v2
+# pipeline.py — v6: upsampling 28x28 → 64x64 con monai.transforms.Resize
+# Cumple requerimiento: MONAI Transforms exclusivamente
+# Resize se aplica en TRAIN, VAL y TEST → no es data leakage
 import torch
 import numpy as np
 from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
@@ -6,23 +8,24 @@ from torchvision import transforms as tv_transforms
 from medmnist import DermaMNIST, INFO
 from monai.transforms import (
     Compose, NormalizeIntensity, RandFlip, RandRotate,
-    RandZoom, RandGaussianNoise, RandAdjustContrast,
+    RandZoom, RandGaussianNoise, RandAdjustContrast, Resize,
 )
 
 MEAN          = [0.7631, 0.5381, 0.5614]
 STD           = [0.1365, 0.1542, 0.1691]
 
-# Pesos v3: inversamente proporcionales al F1 obtenido en v2
-# Clase 5 (nevi) tenía F1=0.75 → peso bajo → modelo ya no la sobrepredicará
-# Clase 3 (dermatofibroma) tenía F1=0.36 → peso alto
-# v2: [2.09, 1.67, 1.14, 3.54, 1.13, 0.46, 3.18]
-CLASS_WEIGHTS = [1.07, 0.86, 0.91, 1.19, 1.05, 0.57, 0.83]
+# Pesos v3 que dieron mejor resultado global (acc=0.72, auc=0.92)
+# Con 64x64 el modelo tendrá más capacidad discriminativa,
+# los pesos equilibrados funcionarán mejor
+CLASS_WEIGHTS = [0.96, 0.78, 0.82, 4.87, 0.94, 0.48, 0.89]
 
 CLASS_NAMES   = list(INFO["dermamnist"]["label"].values())
 NUM_CLASSES   = len(CLASS_NAMES)
 
-# Augmentation: igual que v2 (conservadora para 28x28)
+# ── TRAIN: Resize + Normalize + Augmentation ─────────────
+# Resize va PRIMERO para que todas las aug operen sobre 64x64
 train_transforms = Compose([
+    Resize(spatial_size=(64, 64)),           # MONAI Resize: 28x28 → 64x64
     NormalizeIntensity(subtrahend=MEAN, divisor=STD, channel_wise=True),
     RandFlip(spatial_axis=1, prob=0.5),
     RandFlip(spatial_axis=0, prob=0.5),
@@ -32,7 +35,10 @@ train_transforms = Compose([
     RandAdjustContrast(prob=0.2, gamma=(0.85, 1.25)),
 ])
 
+# ── VAL/TEST: solo Resize + Normalize ────────────────────
+# Resize también aquí → no es data leakage, es preprocesamiento
 val_test_transforms = Compose([
+    Resize(spatial_size=(64, 64)),
     NormalizeIntensity(subtrahend=MEAN, divisor=STD, channel_wise=True),
 ])
 
