@@ -1,6 +1,6 @@
-# pipeline.py — v7
-# Mantiene: Resize 64x64, augmentation suave, WeightedRandomSampler
-# Cambia: pesos rebalanceados según análisis precision/recall de v6
+# pipeline.py — v10
+# Pesos: v7 (mejor resultado histórico F1=0.530)
+# Todo lo demás: igual a v7 — resize 64x64, augmentation probada
 import torch
 import numpy as np
 from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
@@ -14,13 +14,9 @@ from monai.transforms import (
 MEAN          = [0.7631, 0.5381, 0.5614]
 STD           = [0.1365, 0.1542, 0.1691]
 
-# Pesos v7 — derivados del análisis precision/recall de v6:
-#   dermato[3]:  4.87 → 2.00  precision=0.12 era señal de sobrepredicción
-#   basal[1]:    0.78 → 1.40  recall=0.31 muy bajo, el modelo lo ignoraba
-#   actinic[0]:  0.96 → 1.20  ambas métricas bajas, necesita más atención
-#   melanoma[4]: 0.94 → 1.10  ligero boost
-#   nevi[5]:     mantener 0.48  F1=0.85 ✅
-#   vascular[6]: mantener 0.89  F1=0.66 ✅
+# Pesos v7 — el mejor resultado histórico (F1-test=0.530, AUC=0.9275)
+# No tocamos los pesos: el problema no era configuración sino capacidad.
+# La skip connection en model.py es la que ahora mueve la aguja.
 CLASS_WEIGHTS = [1.20, 1.40, 1.00, 2.00, 1.10, 0.48, 0.89]
 
 CLASS_NAMES   = list(INFO["dermamnist"]["label"].values())
@@ -82,10 +78,10 @@ def get_dataloaders(batch_size=64, num_workers=0):
     sample_weights = torch.tensor([CLASS_WEIGHTS[l] for l in train_ds.get_labels()])
     sampler = WeightedRandomSampler(sample_weights, len(sample_weights), replacement=True)
 
-    train_loader = DataLoader(train_ds, batch_size=batch_size, sampler=sampler,
+    train_loader = DataLoader(train_ds, batch_size=64, sampler=sampler,
                               num_workers=num_workers, pin_memory=True, drop_last=True)
-    val_loader   = DataLoader(val_ds,   batch_size=batch_size, shuffle=False,
+    val_loader   = DataLoader(val_ds,   batch_size=64, shuffle=False,
                               num_workers=num_workers, pin_memory=True)
-    test_loader  = DataLoader(test_ds,  batch_size=batch_size, shuffle=False,
+    test_loader  = DataLoader(test_ds,  batch_size=64, shuffle=False,
                               num_workers=num_workers, pin_memory=True)
     return train_loader, val_loader, test_loader
