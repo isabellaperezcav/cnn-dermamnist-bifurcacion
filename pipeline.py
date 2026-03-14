@@ -1,6 +1,8 @@
-# pipeline.py — v10
-# Pesos: v7 (mejor resultado histórico F1=0.530)
-# Todo lo demás: igual a v7 — resize 64x64, augmentation probada
+# pipeline.py — v13
+# Pesos: v10 (los que dieron F1=0.5808, el mejor histórico)
+# Fusiones: ahora correctas según el taller (model.py v3)
+CLASS_WEIGHTS = [1.20, 1.40, 1.00, 2.00, 1.10, 0.48, 0.89]
+
 import torch
 import numpy as np
 from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
@@ -11,16 +13,10 @@ from monai.transforms import (
     RandZoom, RandGaussianNoise, RandAdjustContrast, Resize,
 )
 
-MEAN          = [0.7631, 0.5381, 0.5614]
-STD           = [0.1365, 0.1542, 0.1691]
-
-# Pesos v7 — el mejor resultado histórico (F1-test=0.530, AUC=0.9275)
-# No tocamos los pesos: el problema no era configuración sino capacidad.
-# La skip connection en model.py es la que ahora mueve la aguja.
-CLASS_WEIGHTS = [1.20, 1.40, 1.00, 2.00, 1.10, 0.48, 0.89]
-
-CLASS_NAMES   = list(INFO["dermamnist"]["label"].values())
-NUM_CLASSES   = len(CLASS_NAMES)
+MEAN        = [0.7631, 0.5381, 0.5614]
+STD         = [0.1365, 0.1542, 0.1691]
+CLASS_NAMES = list(INFO["dermamnist"]["label"].values())
+NUM_CLASSES = len(CLASS_NAMES)
 
 train_transforms = Compose([
     Resize(spatial_size=(64, 64)),
