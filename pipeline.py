@@ -1,7 +1,17 @@
-# pipeline.py — v13
-# Pesos: v10 (los que dieron F1=0.5808, el mejor histórico)
-# Fusiones: ahora correctas según el taller (model.py v3)
-CLASS_WEIGHTS = [1.20, 1.40, 1.00, 2.00, 1.10, 0.48, 0.89]
+# pipeline.py — v14
+# BASE: v13 (fusiones correctas del taller + skip connections)
+# F1 histórico: v13=0.5951, val_best=0.6156
+#
+# Cambios de pesos vs v13 [1.20,1.40,1.00,2.00,1.10,0.48,0.89]:
+#   actinic[0]:  1.20→1.50  F1=0.44, prec≈rec, clase más rezagada
+#   basal[1]:    1.40→1.20  rec=0.66 ya OK, prec=0.49 baja → reducir FP
+#   benign[2]:   1.00→1.10  leve boost
+#   dermato[3]:  2.00→2.20  rec=0.52 mejoró pero sigue bajo
+#   melanoma[4]: 1.10→0.90  prec=0.42 con rec=0.65 → frenar falsos positivos
+#   nevi/vascular: sin cambio (✅ estables)
+#
+# ADVERTENCIA APRENDIDA: nunca bajar melanoma más de -0.20 en un paso
+# (en v11 bajamos a 0.70 y rec cayó de 0.71→0.39 — desastre)
 
 import torch
 import numpy as np
@@ -13,10 +23,11 @@ from monai.transforms import (
     RandZoom, RandGaussianNoise, RandAdjustContrast, Resize,
 )
 
-MEAN        = [0.7631, 0.5381, 0.5614]
-STD         = [0.1365, 0.1542, 0.1691]
-CLASS_NAMES = list(INFO["dermamnist"]["label"].values())
-NUM_CLASSES = len(CLASS_NAMES)
+MEAN          = [0.7631, 0.5381, 0.5614]
+STD           = [0.1365, 0.1542, 0.1691]
+CLASS_WEIGHTS = [1.50, 1.20, 1.10, 2.20, 0.90, 0.48, 0.89]
+CLASS_NAMES   = list(INFO["dermamnist"]["label"].values())
+NUM_CLASSES   = len(CLASS_NAMES)
 
 train_transforms = Compose([
     Resize(spatial_size=(64, 64)),
